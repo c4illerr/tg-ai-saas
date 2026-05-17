@@ -67,7 +67,8 @@ const STYLES = {
     clickbait: "Провокационный, взрывной стиль. Яркие метафоры, кричащий заголовок, сильный призыв к действию (CTA).",
     friendly: "Дружелюбный, простой стиль «как для старого друга». Легкий, ламповый и непринужденный.",
     marketing: "Продающий SMM-стиль. Четкое выделение болей целевой аудитории, презентация решения и сочный оффер.",
-    short: "Ультра-короткий формат. Только тезисы, списки и самая суть. Идеально для инфографики и карточек."
+    short: "Ультра-короткий формат. Только тезисы, списки и самая суть. Идеально для инфографики и карточек.",
+    custom: "Уникальный комбинированный стиль, настроенный пользователем вручную под его нужды."
 };
 
 function safeMarkdown(text) {
@@ -108,48 +109,71 @@ function initUser(chatId) {
 }
 
 function getSettingsMenuData(user) {
-    const currentStyleName = 
-        user.style === 'expert' ? '💼 Экспертный' : 
-        user.style === 'creative' ? '🎨 Креативный' : 
-        user.style === 'clickbait' ? '⚡ Кликбейт' : 
-        user.style === 'marketing' ? '📈 Продающий' :
-        user.style === 'short' ? '📝 Краткий' : '🤝 Дружелюбный';
+    let styleDisplay = "";
+    if (user.style === 'custom') styleDisplay = '⚙️ КОМБИНИРОВАННЫЙ (Ручной)';
+    else if (user.style === 'expert') styleDisplay = '💼 Экспертный';
+    else if (user.style === 'creative') styleDisplay = '🎨 Креативный';
+    else if (user.style === 'clickbait') styleDisplay = '⚡ Кликбейт';
+    else if (user.style === 'marketing') styleDisplay = '📈 Продающий';
+    else if (user.style === 'short') styleDisplay = '📝 Краткий';
+    else styleDisplay = '🤝 Дружелюбный';
 
-    const text = `⚙️ *Управление комбинацией параметров ИИ:*\n\n` +
-                 `• Выбранный стиль: *${currentStyleName}*\n` +
-                 `• Использование эмодзи: *${user.useEmojis ? '✅ Да' : '❌ Нет'}*\n` +
-                 `• Генерация хэштегов: *${user.includeHashtags ? '✅ Да' : '❌ Нет'}*\n\n` +
-                 `Параметры комбинируются автоматически! Измените их кнопками:`;
+    const text = `⚙️ *Меню настроек ИИ-стиля:*\n\n` +
+                 `• Активный режим: *${styleDisplay}*\n` +
+                 `• Использование эмодзи: *${user.useEmojis ? '✅ Включены' : '❌ Выключены'}*\n` +
+                 `• Генерация хэштегов: *${user.includeHashtags ? '✅ Включены' : '❌ Выключены'}*\n\n` +
+                 `Вы можете выбрать готовый шаблон стиля или собрать свой собственный микс:`;
 
     const keyboard = {
         inline_keyboard: [
             [{ text: "💼 Экспертный", callback_data: "style_expert" }, { text: "🎨 Креативный", callback_data: "style_creative" }],
             [{ text: "⚡ Кликбейт", callback_data: "style_clickbait" }, { text: "🤝 Дружелюбный", callback_data: "style_friendly" }],
-            [{ text: "📈 Продающий SMM", callback_data: "style_marketing" }, { text: "📝 Краткий тезисный", callback_data: "style_short" }],
-            [{ text: `${user.useEmojis ? '🟢 Эмодзи: ВКЛ' : '🔴 Эмодзи: ВЫКЛ'}`, callback_data: "toggle_emojis" }],
-            [{ text: `${user.includeHashtags ? '🟢 Хэштеги: ВКЛ' : '🔴 Хэштеги: ВЫКЛ'}`, callback_data: "toggle_hashtags" }]
+            [{ text: "📈 Продающий", callback_data: "style_marketing" }, { text: "📝 Краткий", callback_data: "style_short" }],
+            [{ text: "🎛️ СОБРАТЬ КОМБИНИРОВАННЫЙ ВЫБОР", callback_data: "setup_combined_start" }]
         ]
     };
     return { text, keyboard };
 }
 
 // ==========================================
-// БЛОК АДМИН-ПАНЕЛИ (ТОЛЬКО ДЛЯ ТЕБЯ)
+// БЛОК АДМИН-ПАНЕЛИ (С НОВЫМИ ФИЧАМИ)
 // ==========================================
 
 bot.onText(/\/admin/, (msg) => {
     const chatId = msg.chat.id;
     if (chatId !== ADMIN_ID) return;
 
-    bot.sendMessage(chatId, "🛠️ *Добро пожаловать в Админ-панель управления ботом!*", {
+    bot.sendMessage(chatId, "🛠 *Панель Создателя ботов (svrtwww)*\nУправляй базой данных и продвижением в один клик:", {
         parse_mode: 'Markdown',
         reply_markup: {
             inline_keyboard: [
-                [{ text: "📊 Статистика бота", callback_data: "admin_stats" }],
-                [{ text: "✉️ Запустить общую рассылку", callback_data: "admin_broadcast_start" }]
+                [{ text: "📊 Статистика бота", callback_data: "admin_stats" }, { text: "✉️ Запустить общую рассылку", callback_data: "admin_broadcast_start" }],
+                [{ text: "💎 Выдать Premium абсолютно ВСЕМ", callback_data: "admin_premium_all" }],
+                [{ text: "🔄 Сбросить лимиты генераций всем", callback_data: "admin_reset_all" }]
             ]
         }
     });
+});
+
+bot.onText(/\/userinfo (.+)/, (msg, match) => {
+    const chatId = msg.chat.id;
+    if (chatId !== ADMIN_ID) return;
+
+    const targetId = match[1].trim();
+    const target = dbData.users[targetId];
+
+    if (!target) return bot.sendMessage(chatId, "❌ Юзер не найден в БД.");
+
+    const info = `👤 *Инфо о пользователе \`${targetId}\`:*\n\n` +
+                 `• Статус: *${target.isPremium ? 'Premium 💎' : 'Обычный 🆓'}*\n` +
+                 `• Использовано генераций: *${target.count}/${LIMIT}*\n` +
+                 `• Стиль: *${target.style}*\n` +
+                 `• Эмодзи: *${target.useEmojis ? 'Да' : 'Нет'}*\n` +
+                 `• Хэштеги: *${target.includeHashtags ? 'Да' : 'Нет'}*\n` +
+                 `• Ниша проекта: _${target.projectName}_\n` +
+                 `• Аудитория: _${target.projectTarget}_`;
+
+    bot.sendMessage(chatId, info, { parse_mode: 'Markdown' });
 });
 
 bot.onText(/\/gencode (.+) (.+)/, (msg, match) => {
@@ -159,13 +183,11 @@ bot.onText(/\/gencode (.+) (.+)/, (msg, match) => {
     const codeName = match[1].trim().toUpperCase();
     const maxUses = parseInt(match[2], 10);
 
-    if (isNaN(maxUses) || maxUses <= 0) {
-        return bot.sendMessage(chatId, "❌ Ошибка. Количество активаций должно быть числом.");
-    }
+    if (isNaN(maxUses) || maxUses <= 0) return bot.sendMessage(chatId, "❌ Ошибка в количестве.");
 
     dbData.promocodes[codeName] = { maxUses: maxUses, usesLeft: maxUses, usersActivated: [] };
     saveDatabase();
-    bot.sendMessage(chatId, `✅ *Промокод успешно создан!*\n\n• Код: \`${codeName}\`\n• Активаций: *${maxUses}*`, { parse_mode: 'Markdown' });
+    bot.sendMessage(chatId, `✅ Промокод \`${codeName}\` на *${maxUses}* юзеров создан!`, { parse_mode: 'Markdown' });
 });
 
 bot.onText(/\/setpremium (.+) (.+)/, (msg, match) => {
@@ -175,30 +197,24 @@ bot.onText(/\/setpremium (.+) (.+)/, (msg, match) => {
     const targetId = match[1].trim();
     const setPremium = match[2].trim() === 'true';
 
-    if (!dbData.users[targetId]) {
-        return bot.sendMessage(chatId, `❌ Пользователь с ID \`${targetId}\` не найден в базе данных.`, { parse_mode: 'Markdown' });
-    }
+    if (!dbData.users[targetId]) return bot.sendMessage(chatId, `❌ Пользователь не найден.`);
 
     dbData.users[targetId].isPremium = setPremium;
     if (setPremium) dbData.users[targetId].count = 0;
     saveDatabase();
 
-    bot.sendMessage(chatId, `✅ Статус пользователя \`${targetId}\` успешно изменен.\n• Premium: *${setPremium ? 'ВКЛ 💎' : 'ВЫКЛ 🆓'}*`, { parse_mode: 'Markdown' });
-    
-    bot.sendMessage(targetId, setPremium 
-        ? "🎉 Администратор вручную активировал вам полный **Premium-доступ**! Все лимиты сняты." 
-        : "⚠️ Ваш Premium-статус был изменен администратором на базовый.", { parse_mode: 'Markdown' }).catch(() => {});
+    bot.sendMessage(chatId, `✅ ID \`${targetId}\` изменен. Premium: *${setPremium ? 'ВКЛ' : 'ВЫКЛ'}*`, { parse_mode: 'Markdown' });
+    bot.sendMessage(targetId, setPremium ? "🎉 Администратор выдал вам полный **Premium-доступ**!" : "⚠️ Ваш Premium-доступ отключен.", { parse_mode: 'Markdown' }).catch(() => {});
 });
 
 // ==========================================
-// ОСНОВНАЯ ЛОГИКА БОТА
+// ОСНОВНАЯ ЛОГИКА БОТА И ОПРОСНИКА
 // ==========================================
 
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
     initUser(chatId);
-    const welcomeText = `Привет, ${msg.from.first_name}! 👋\n\nЯ твой персональный ИИ-копирайтер для Telegram-каналов.\n\nНастрой параметры текста под себя в меню «⚙️ Настройки стиля» и присылай задачу!`;
-    bot.sendMessage(chatId, welcomeText, getMainKeyboard());
+    bot.sendMessage(chatId, `Привет, ${msg.from.first_name}! 👋\n\nЯ твой персональный ИИ-копирайтер. Настрой свой стиль и погнали писать контент!`, getMainKeyboard());
 });
 
 bot.on('message', async (msg) => {
@@ -212,10 +228,8 @@ bot.on('message', async (msg) => {
     if (chatId === ADMIN_ID && user.status === 'admin_waiting_broadcast') {
         user.status = 'idle';
         saveDatabase();
-        
         const allUserIds = Object.keys(dbData.users);
-        bot.sendMessage(chatId, `📢 Начинаю рассылку для *${allUserIds.length}* пользователей...`, { parse_mode: 'Markdown' });
-        
+        bot.sendMessage(chatId, `📢 Рассылаю сообщения для *${allUserIds.length}* человек...`, { parse_mode: 'Markdown' });
         let successCount = 0;
         for (const uId of allUserIds) {
             try {
@@ -224,19 +238,15 @@ bot.on('message', async (msg) => {
                 await new Promise(resolve => setTimeout(resolve, 50)); 
             } catch (err) {}
         }
-        return bot.sendMessage(chatId, `🎉 *Рассылка успешно завершена!*\n\nДоставлено пользователей: *${successCount}/${allUserIds.length}*`, { parse_mode: 'Markdown', reply_markup: getMainKeyboard() });
+        return bot.sendMessage(chatId, `🎉 Рассылка окончена! Доставлено: *${successCount}/${allUserIds.length}*`, { parse_mode: 'Markdown', reply_markup: getMainKeyboard() });
     }
 
     // Проверка промокодов
     const inputCode = text.trim().toUpperCase();
     if (dbData.promocodes[inputCode]) {
         const promo = dbData.promocodes[inputCode];
-        if (promo.usersActivated.includes(chatId.toString())) {
-            return bot.sendMessage(chatId, "⚠️ Вы уже активировали этот промокод ранее!");
-        }
-        if (promo.usesLeft <= 0) {
-            return bot.sendMessage(chatId, "❌ К сожалению, этот промокод уже закончился.");
-        }
+        if (promo.usersActivated.includes(chatId.toString())) return bot.sendMessage(chatId, "⚠️ Этот промокод вы уже вводили!");
+        if (promo.usesLeft <= 0) return bot.sendMessage(chatId, "❌ Места на промокод закончились.");
 
         promo.usesLeft--;
         promo.usersActivated.push(chatId.toString());
@@ -244,23 +254,22 @@ bot.on('message', async (msg) => {
         user.count = 0;
         user.status = 'idle';
         saveDatabase();
-
-        return bot.sendMessage(chatId, `🎉 *Промокод успешно применен!*\n\nЛимиты сброшены!`, { parse_mode: 'Markdown', reply_markup: getMainKeyboard() });
+        return bot.sendMessage(chatId, `🎉 Промокод сработал! Безлимит активирован.`, { parse_mode: 'Markdown', reply_markup: getMainKeyboard() });
     }
 
     // Текстовая персонализация
     if (user.status === 'waiting_project_name') {
         user.projectName = text.trim();
-        user.status = 'idle';
+        user.status = 'waiting_project_target';
         saveDatabase();
-        return bot.sendMessage(chatId, `✅ Сохранено: *${user.projectName}*.\n\nТеперь введите описание вашей целевой аудитории:`, { parse_mode: 'Markdown' });
+        return bot.sendMessage(chatId, `✅ Название сохранено.\n\nТеперь отправьте текстом описание вашей *Целевой аудитории (ЦА)*:`, { parse_mode: 'Markdown' });
     }
 
     if (user.status === 'waiting_project_target') {
         user.projectTarget = text.trim();
         user.status = 'idle';
         saveDatabase();
-        return bot.sendMessage(chatId, `🎉 *Персонализация настроена!*\n\n• Проект: *${user.projectName}*\n• Аудитория: *${user.projectTarget}*`, { parse_mode: 'Markdown', reply_markup: getMainKeyboard() });
+        return bot.sendMessage(chatId, `🎉 *Данные бизнеса обновлены!*\n• Проект: *${user.projectName}*\n• Аудитория: *${user.projectTarget}*`, { parse_mode: 'Markdown', reply_markup: getMainKeyboard() });
     }
 
     if (text === "⚙️ Настройки стиля") {
@@ -269,11 +278,7 @@ bot.on('message', async (msg) => {
     }
 
     if (text === "🎯 Мой проект (Персонализация)") {
-        const message = `🎯 *Персонализация текстов под ваш бизнес:*\n\n` +
-                        `• Ваш проект/канал: *${user.projectName}*\n` +
-                        `• Целевая аудитории: *${user.projectTarget}*\n\n` +
-                        `Нейросеть адаптирует контент под эти данные!`;
-        return bot.sendMessage(chatId, message, {
+        return bot.sendMessage(chatId, `🎯 *Персонализация ИИ под ваш бренд:*\n\n• Ниша/Проект: *${user.projectName}*\n• Ваша аудитория: *${user.projectTarget}*`, {
             parse_mode: 'Markdown',
             reply_markup: { inline_keyboard: [[{ text: "✏️ Изменить данные проекта", callback_data: "edit_project_data" }]] }
         });
@@ -287,16 +292,13 @@ bot.on('message', async (msg) => {
             message += "✨ Вам доступны безлимитные генерации без ограничений!";
             return bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
         } else {
-            message += `🚀 *Избавься от лимитов и открой Premium!*\n\n` +
-                       `🪙 *Способ 1:* Моментальная оплата криптовалютой (3 USDT) через защищенный шлюз CryptoBot.\n\n` +
-                       `💳 *Способ 2:* Оплата обычной банковской картой РФ / СБП (290 рублей). Для этого переведите нужную сумму на карту и пришлите чек администратору. Нажмите кнопку ниже для связи.\n\n` +
-                       `💬 Если у вас есть промокод — просто отправьте его сообщением в этот чат!`;
+            message += `🚀 *Купить Premium-доступ:*\n\n🪙 *Крипта:* 3 USDT через автоматический CryptoBot.\n💳 *Карта РФ:* 290 рублей переводом.\n\nОтправь промокод в чат, если он у тебя есть.`;
             return bot.sendMessage(chatId, message, {
                 parse_mode: 'Markdown',
                 reply_markup: {
                     inline_keyboard: [
                         [{ text: "🪙 Оплатить в USDT (CryptoBot)", callback_data: "buy_crypto" }],
-                        [{ text: "👤 Оплатить Картой РФ (Написать Админу)", url: `https://t.me/${ADMIN_USERNAME}` }]
+                        [{ text: "👤 Оплатить Картой РФ (Админ)", url: `https://t.me/${ADMIN_USERNAME}` }]
                     ]
                 }
             });
@@ -304,51 +306,40 @@ bot.on('message', async (msg) => {
     }
 
     if (user.count >= LIMIT && !user.isPremium) {
-        user.status = 'idle';
-        saveDatabase();
-        return bot.sendMessage(chatId, `❌ *Доступ заблокирован!*\n\nВы исчерпали лимит бесплатных генераций (${LIMIT}/${LIMIT}).\n\nДля продления оплатите счет в USDT через кнопку ниже или напишите админу для оплаты картой РФ.`, {
-            parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: "🪙 Оплатить в USDT (CryptoBot)", callback_data: "buy_crypto" }],
-                    [{ text: "👤 Оплатить Картой (Написать Админу)", url: `https://t.me/${ADMIN_USERNAME}` }]
-                ]
-            }
+        return bot.sendMessage(chatId, `❌ *Лимит генераций исчерпан (${LIMIT}/${LIMIT})!*\n\nПерейдите в профиль для разблокировки безлимита.`, {
+            reply_markup: { inline_keyboard: [[{ text: "💎 Открыть профиль / Купить", callback_data: "💎 Мой профиль / Купить Premium" }]] }
         });
     }
 
     if (text === "🔥 Создать пост") {
         user.status = 'waiting_text';
         saveDatabase();
-        return bot.sendMessage(chatId, "📝 Отправь мне сырой текст или тему поста:");
+        return bot.sendMessage(chatId, "📝 Отправьте тему поста или тезисы (ИИ переработает их по вашим настройкам):");
     }
 
-    // ==========================================
-    // ГЕНЕРАЦИЯ ТЕКСТА ИИ (ОБНОВЛЕННЫЙ ЖЕСТКИЙ ПРОМПТ)
-    // ==========================================
+    // Генерация текста ИИ
     if (user.status === 'waiting_text' || (!text.startsWith('⚙️') && !text.startsWith('💎') && !text.startsWith('🔥') && !text.startsWith('🎯'))) {
         bot.sendChatAction(chatId, 'typing');
         
-        const chosenStyleInstructions = STYLES[user.style];
+        const chosenStyleInstructions = STYLES[user.style] || STYLES['creative'];
         
-        // Формируем строгие изолированные инструкции для комбинации флагов настроек
         let systemPrompt = `Ты — профессиональный Telegram-копирайтер.\n`;
-        systemPrompt += `1. ТВОЙ СТИЛЬ: ${chosenStyleInstructions}\n`;
+        systemPrompt += `1. ОСНОВНОЙ СТИЛЬ ТЕКСТА: ${chosenStyleInstructions}\n`;
         
         if (user.useEmojis) {
-            systemPrompt += `2. ЭМОДЗИ: Обязательно используй подходящие эмодзи для оформления структуры, списков и акцентов. Сделай текст визуально привлекательным.\n`;
+            systemPrompt += `2. ОФОРМЛЕНИЕ (ЭМОДЗИ): Обязательно добавляй релевантные эмодзи для структуры, списков и буллетов. Делай пост ярким.\n`;
         } else {
-            systemPrompt += `2. ЭМОДЗИ: Категорически запрещено использовать абсолютно любые эмодзи, смайлики или графические символы в тексте. Выдавай только чистый голый текст.\n`;
+            systemPrompt += `2. ОФОРМЛЕНИЕ (ЭМОДЗИ): Категорически запрещено использовать абсолютно любые эмодзи, смайлы или иконки. Только текст и буквы.\n`;
         }
         
         if (user.includeHashtags) {
-            systemPrompt += `3. ХЭШТЕГИ: В самом конце текста с новой строки добавь 3-5 релевантных хэштегов.\n`;
+            systemPrompt += `3. МЕТКИ (ХЭШТЕГИ): С новой строки в самом конце поста сгенерируй и вставь 3-5 хэштегов.\n`;
         } else {
-            systemPrompt += `3. ХЭШТЕГИ: Категорически запрещено добавлять любые хэштеги в конце или внутри текста.\n`;
+            systemPrompt += `3. МЕТКИ (ХЭШТЕГИ): Категорически запрещено вставлять хэштеги.\n`;
         }
         
-        systemPrompt += `4. КОНТЕКСТ БИЗНЕСА: Название проекта — "${user.projectName}". Целевая аудитория — "${user.projectTarget}". Обязательно адаптируй боли, триггеры и выгоды текста конкретно под эту аудиторию.\n`;
-        systemPrompt += `Выдай ТОЛЬКО готовый финальный пост для публикации, без твоих вводных слов, приветствий и каких-либо комментариев автора.`;
+        systemPrompt += `4. ЦЕЛЕВАЯ АУДИТОРИЯ: Название компании — "${user.projectName}". Мы пишем для людей со следующими болями и интересами: "${user.projectTarget}". Сделай упор на этот контекст.\n`;
+        systemPrompt += `Отправь ТОЛЬКО готовый пост. Без комментариев от себя, без фраз "Вот ваш пост:".`;
 
         try {
             const response = await axios.post(
@@ -381,12 +372,12 @@ bot.on('message', async (msg) => {
 
         } catch (error) {
             console.error('Ошибка OpenRouter:', error.message);
-            bot.sendMessage(chatId, "⚠️ Ошибка связи с нейросетью. Попробуйте еще раз.", getMainKeyboard());
+            bot.sendMessage(chatId, "⚠️ Ошибка нейросети. Попробуйте еще раз через секунд 10.", getMainKeyboard());
         }
     }
 });
 
-// Инлайн-кнопки
+// Инлайн-кнопки (Логика и Комбинированный конструктор)
 bot.on('callback_query', async (query) => {
     const chatId = query.message.chat.id;
     const data = query.data;
@@ -394,47 +385,106 @@ bot.on('callback_query', async (query) => {
 
     const answerCallback = () => { try { bot.answerCallbackQuery(query.id); } catch (e) {} };
 
-    const refreshMenu = async () => {
-        const menu = getSettingsMenuData(user);
-        try {
-            await bot.editMessageText(menu.text, {
-                chat_id: chatId, message_id: query.message.message_id, parse_mode: 'Markdown', reply_markup: menu.keyboard
-            });
-        } catch (e) {}
-    };
+    // Обработка Мастера Комбинированного выбора
+    if (data === 'setup_combined_start') {
+        answerCallback();
+        return bot.editMessageText("🎛️ *Конструктор комбинированного выбора (Шаг 1 из 2)*\n\nИспользовать эмодзи и иконки для красивой разметки текста списков?", {
+            chat_id: chatId,
+            message_id: query.message.message_id,
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: "✅ Да, добавлять эмодзи", callback_data: "comb_emoji_true" }],
+                    [{ text: "❌ Нет, строгий текст без смайлов", callback_data: "comb_emoji_false" }]
+                ]
+            }
+        });
+    }
 
+    if (data.startsWith('comb_emoji_')) {
+        answerCallback();
+        user.useEmojis = (data.replace('comb_emoji_', '') === 'true');
+        saveDatabase();
+        return bot.editMessageText("🎛️ *Конструктор комбинированного выбора (Шаг 2 из 2)*\n\nГенерировать автоматический блок хэштегов (#тег) в конце публикации?", {
+            chat_id: chatId,
+            message_id: query.message.message_id,
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: "✅ Да, хэштеги нужны", callback_data: "comb_tags_true" }],
+                    [{ text: "❌ Нет, без хэштегов", callback_data: "comb_tags_false" }]
+                ]
+            }
+        });
+    }
+
+    if (data.startsWith('comb_tags_')) {
+        answerCallback();
+        user.includeHashtags = (data.replace('comb_tags_', '') === 'true');
+        user.style = 'custom'; // Переключаем режим на кастомный ручной стиль!
+        saveDatabase();
+        
+        bot.sendMessage(chatId, "🚀 *Комбинированный выбор успешно собран и активирован!*\nТеперь ИИ будет создавать посты строго по вашей личной схеме.");
+        const menu = getSettingsMenuData(user);
+        return bot.sendMessage(chatId, menu.text, { parse_mode: 'Markdown', reply_markup: menu.keyboard });
+    }
+
+    // АДМИНСКИЕ ФИЧИ
     if (chatId === ADMIN_ID && data === 'admin_stats') {
         answerCallback();
         const users = Object.values(dbData.users);
         const total = users.length;
         const premium = users.filter(u => u.isPremium).length;
-        const free = total - premium;
-        
-        return bot.sendMessage(chatId, `📊 *Текущая статистика проекта:*\n\n• Всего пользователей в БД: *${total}*\n• С активным Premium: *${premium} 💎*\n• На бесплатном плане: *${free} 🆓*`, { parse_mode: 'Markdown' });
+        return bot.sendMessage(chatId, `📊 *Статистика*\n• Пользователей: *${total}*\n• С Premium: *${premium}*`, { parse_mode: 'Markdown' });
     }
 
     if (chatId === ADMIN_ID && data === 'admin_broadcast_start') {
         answerCallback();
         user.status = 'admin_waiting_broadcast';
         saveDatabase();
-        return bot.sendMessage(chatId, "✉️ *Введите текст для общей рассылки всем пользователям:*", { parse_mode: 'Markdown' });
+        return bot.sendMessage(chatId, "✉️ Отправьте следующим сообщением текст рассылки:");
     }
 
+    if (chatId === ADMIN_ID && data === 'admin_premium_all') {
+        answerCallback();
+        const keys = Object.keys(dbData.users);
+        keys.forEach(k => { dbData.users[k].isPremium = true; dbData.users[k].count = 0; });
+        saveDatabase();
+        return bot.sendMessage(chatId, `💎 Всем *${keys.length}* пользователям выдан Premium-статус!`);
+    }
+
+    if (chatId === ADMIN_ID && data === 'admin_reset_all') {
+        answerCallback();
+        const keys = Object.keys(dbData.users);
+        keys.forEach(k => { dbData.users[k].count = 0; });
+        saveDatabase();
+        return bot.sendMessage(chatId, `🔄 Счетчики генераций всех *${keys.length}* юзеров успешно обнулены.`);
+    }
+
+    // Шаблоны обычных стилей
     if (data.startsWith('style_')) {
-        answerCallback(); user.style = data.replace('style_', ''); saveDatabase(); await refreshMenu(); return;
-    }
-    if (data === 'toggle_hashtags') {
-        answerCallback(); user.includeHashtags = !user.includeHashtags; saveDatabase(); await refreshMenu(); return;
-    }
-    if (data === 'toggle_emojis') {
-        answerCallback(); user.useEmojis = !user.useEmojis; saveDatabase(); await refreshMenu(); return;
-    }
-    if (data === 'edit_project_data') {
-        answerCallback(); user.status = 'waiting_project_name'; saveDatabase();
-        return bot.sendMessage(chatId, "✏️ Введите название вашего проекта или нишу бизнеса:");
+        answerCallback();
+        user.style = data.replace('style_', '');
+        if (user.style === 'expert' || user.style === 'short') user.useEmojis = false; 
+        else user.useEmojis = true;
+        user.includeHashtags = true;
+        saveDatabase();
+        
+        const menu = getSettingsMenuData(user);
+        try {
+            await bot.editMessageText(menu.text, { chat_id: chatId, message_id: query.message.message_id, parse_mode: 'Markdown', reply_markup: menu.keyboard });
+        } catch (e) {}
+        return;
     }
 
-    // Оплата CryptoBot
+    if (data === 'edit_project_data') {
+        answerCallback();
+        user.status = 'waiting_project_name';
+        saveDatabase();
+        return bot.sendMessage(chatId, "✏️ Введите название проекта или нишу бизнеса:");
+    }
+
+    // Инвойс CryptoBot
     if (data === 'buy_crypto') {
         answerCallback();
         try {
@@ -442,7 +492,7 @@ bot.on('callback_query', async (query) => {
                 description: 'Premium ИИ-Копирайтер', payload: chatId.toString(), create_invoice_link: true 
             });
             if (invoice && invoice.pay_url) {
-                bot.sendMessage(chatId, `💸 *Счет в USDT успешно создан!*\n\nСтоимость: *${PRICE_USD} USDT*\n\nОплатите счет и нажмите кнопку проверки ниже.`, {
+                bot.sendMessage(chatId, `💸 *Счет: ${PRICE_USD} USDT*\n\nОплатите и нажмите кнопку верификации:`, {
                     parse_mode: 'Markdown',
                     reply_markup: {
                         inline_keyboard: [
@@ -453,11 +503,10 @@ bot.on('callback_query', async (query) => {
                 });
             }
         } catch (error) {
-            bot.sendMessage(chatId, '⚠️ Ошибка шлюза криптовалюты. Попробуйте позже.');
+            bot.sendMessage(chatId, '⚠️ Крипто-шлюз перегружен. Попробуйте позже.');
         }
     }
 
-    // Проверка CryptoBot
     if (data.startsWith('check_pay_')) {
         answerCallback();
         const invoiceId = data.replace('check_pay_', ''); 
@@ -467,9 +516,9 @@ bot.on('callback_query', async (query) => {
                 const inv = invoices.items[0];
                 if (inv.status === 'paid') {
                     user.isPremium = true; user.count = 0; saveDatabase(); 
-                    return bot.sendMessage(chatId, "🎉 *Premium-статус активирован через CryptoBot!*", { parse_mode: 'Markdown', reply_markup: getMainKeyboard() });
+                    return bot.sendMessage(chatId, "🎉 Premium активирован!", { reply_markup: getMainKeyboard() });
                 } else {
-                    return bot.sendMessage(chatId, "❌ Оплата еще не проведена в кошельке.");
+                    return bot.sendMessage(chatId, "❌ Оплата не найдена.");
                 }
             }
         } catch (err) {
@@ -478,8 +527,26 @@ bot.on('callback_query', async (query) => {
     }
 });
 
-// Запуск веб-сервера 
+// ==========================================
+// ЗАПУСК ВЕБ-СЕРВЕРА И ЗАЩИТА ОТ СПЯЧКИ (PING)
+// ==========================================
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.get('/', (req, res) => res.send('Protected AI SaaS is Live!'));
-app.listen(PORT, () => console.log(`Сервер слушает порт ${PORT}`));
+
+app.get('/', (req, res) => res.send('SaaS API is Online'));
+
+app.listen(PORT, () => {
+    console.log(`Сервер запущен на порту ${PORT}`);
+    
+    // Каждые 10 минут (600 000 мс) бот будет пинговать сам себя,
+    // чтобы Render не переводил его бесплатный тариф в спящий режим.
+    setInterval(async () => {
+        try {
+            const url = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+            await axios.get(url);
+            console.log(`📡 Авто-пинг выполнен: сервер активен.`);
+        } catch (err) {
+            console.error(`⚠️ Ошибка авто-пинга:`, err.message);
+        }
+    }, 600000); 
+});
