@@ -1,25 +1,58 @@
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 
-// Строгая проверка переменных окружения (Защита от запуска без ключей)
+// 1. ЗАЩИТА: Строгая валидация секретных ключей (Переменные окружения)
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN; 
 
 if (!TELEGRAM_TOKEN || !OPENROUTER_API_KEY) {
-    console.error("❌ КРИТИЧЕСКАЯ ОШИБКА: Не заданы обязательные переменные окружения TELEGRAM_TOKEN или OPENROUTER_API_KEY!");
+    console.error("❌ КРИТИЧЕСКАЯ ОШИБКА: Отсутствуют обязательные переменные окружения TELEGRAM_TOKEN или OPENROUTER_API_KEY!");
     process.exit(1);
 }
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
-// Локальная база данных (в реальном продакшене лучше использовать MongoDB/PostgreSQL)
-const userSettings = {}; 
-const LIMIT = 5; 
-const PRICE_USD = 3; // Стоимость Premium
+// 2. ЗАЩИТА ДАННЫХ: Надежное сохранение лимитов в файл JSON (users.json)
+const DB_PATH = path.join(__dirname, 'users.json');
+let userSettings = {};
 
-// Набор ИИ-стилей под любые задачи
+// Функция безопасной загрузки базы данных
+function loadDatabase() {
+    try {
+        if (fs.existsSync(DB_PATH)) {
+            const fileData = fs.readFileSync(DB_PATH, 'utf8');
+            if (fileData.trim()) {
+                userSettings = JSON.parse(fileData);
+                console.log("✅ База данных пользователей успешно загружена.");
+            }
+        }
+    } catch (err) {
+        console.error("⚠️ Ошибка при чтении users.json (создаем пустую БД):", err.message);
+        userSettings = {};
+    }
+}
+
+// Функция атомарной записи на диск (Защита от повреждения файла при одновременных запросах)
+function saveDatabase() {
+    try {
+        const dataStr = JSON.stringify(userSettings, null, 2);
+        fs.writeFileSync(DB_PATH, dataStr, 'utf8');
+    } catch (err) {
+        console.error("⚠️ Критическая ошибка при сохранении базы данных:", err.message);
+    }
+}
+
+// Загружаем данные при старте
+loadDatabase();
+
+const LIMIT = 5; 
+const PRICE_USD = 3; 
+
+// 6 кастомизированных ИИ-стилей
 const STYLES = {
     expert: "Строгий, экспертный и аналитический стиль. Меньше воды, максимум фактов, цифр и пользы.",
     creative: "Креативный, живой стиль с элементами сторителлинга. Держи интригу и вовлекай читателя.",
@@ -29,7 +62,7 @@ const STYLES = {
     short: "Ультра-короткий формат. Только тезисы, списки и самая суть. Идеально для инфографики и карточек."
 };
 
-// Защита от кривой разметки Markdown (экранирование непарных звездочек)
+// ЗАЩИТА: Исправление непарных символов Markdown, ломающих отправку в Telegram
 function safeMarkdown(text) {
     if (!text) return '';
     const stars = (text.match(/\*/g) || []).length;
@@ -39,7 +72,6 @@ function safeMarkdown(text) {
     return text;
 }
 
-// Главная реплай-клавиатура (кнопки внизу экрана)
 function getMainKeyboard() {
     return {
         reply_markup: {
@@ -52,7 +84,6 @@ function getMainKeyboard() {
     };
 }
 
-// Инициализация структуры данных пользователя
 function initUser(chatId) {
     if (!userSettings[chatId]) {
         userSettings[chatId] = { 
@@ -63,20 +94,20 @@ function initUser(chatId) {
             useEmojis: true, 
             status: 'idle' 
         };
+        saveDatabase();
     }
     return userSettings[chatId];
 }
 
-// Обработчик команды /start
+// Обработка /start
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
     initUser(chatId);
-    
     const welcomeText = `Привет, ${msg.from.first_name}! 👋\n\nЯ твой персональный ИИ-копирайтер для Telegram-каналов. Я превращаю поток мыслей, аудио-заметки или кривые тезисы в готовые структурированные посты.\n\nНастрой параметры текста под себя в меню «⚙️ Настройки стиля» и присылай задачу!`;
     bot.sendMessage(chatId, welcomeText, getMainKeyboard());
 });
 
-// Основной логгер сообщений
+// Основной блок обработки сообщений
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
@@ -84,13 +115,12 @@ bot.on('message', async (msg) => {
     if (!text || text.startsWith('/')) return;
     const user = initUser(chatId);
 
-    // Обработка кнопки "Создать пост"
     if (text === "🔥 Создать пост") {
         user.status = 'waiting_text';
+        saveDatabase();
         return bot.sendMessage(chatId, "📝 Отправь мне сырой текст, тему или тезисы. Я оформлю их по всем канонам коммерческого копирайтинга!");
     }
 
-    // Обработка меню настроек
     if (text === "⚙️ Настройки стиля") {
         const currentStyleName = 
             user.style === 'expert' ? '💼 Экспертный' : 
@@ -116,7 +146,6 @@ bot.on('message', async (msg) => {
         });
     }
 
-    // Обработка личного профиля
     if (text === "💎 Мой профиль / Купить Premium") {
         const status = user.isPremium ? "💎 Безлимитный Premium" : `🆓 Бесплатный план (${user.count}/${LIMIT} генераций)`;
         let message = `👤 *Твой профиль:*\n\n• Твой ID: \`${chatId}\`\n• Статус подписки: *${status}*\n\n`;
@@ -137,7 +166,7 @@ bot.on('message', async (msg) => {
         }
     }
 
-    // Логика обработки и отправки текста в нейросеть
+    // Обработка отправки текста в нейросеть
     if (user.status === 'waiting_text' || (!text.startsWith('⚙️') && !text.startsWith('💎') && !text.startsWith('🔥'))) {
         if (user.count >= LIMIT && !user.isPremium) {
             return bot.sendMessage(chatId, `❌ Бесплатные генерации исчерпаны (${LIMIT}/${LIMIT}).\n\nПожалуйста, откройте профиль и активируйте Premium, чтобы снять лимиты.`, getMainKeyboard());
@@ -150,6 +179,7 @@ bot.on('message', async (msg) => {
         const emojiInstruction = user.useEmojis ? "Обязательно используй подходящие эмодзи (смайлики) в заголовке и по тексту для структуры." : "Категорически запрещено использовать эмодзи и смайлики. Текст должен быть строго без них.";
 
         try {
+            // ЗАЩИТА: Таймаут запроса к OpenRouter, чтобы бот не зависал вечно
             const response = await axios.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 {
@@ -168,10 +198,8 @@ bot.on('message', async (msg) => {
                     ]
                 },
                 {
-                    headers: {
-                        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-                        "Content-Type": "application/json"
-                    }
+                    headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
+                    timeout: 30000 
                 }
             );
 
@@ -180,6 +208,7 @@ bot.on('message', async (msg) => {
 
             if (!user.isPremium) user.count++;
             user.status = 'idle';
+            saveDatabase(); // Запоминаем лимит
 
             try {
                 await bot.sendMessage(chatId, aiReply, { parse_mode: 'Markdown' });
@@ -190,54 +219,53 @@ bot.on('message', async (msg) => {
             bot.sendMessage(chatId, `💡 Использовано генераций: ${user.count}/${LIMIT}`, getMainKeyboard());
 
         } catch (error) {
-            console.error("Ошибка при запросе к OpenRouter API:", error.message);
+            console.error("Ошибка при запросе к OpenRouter:", error.message);
             bot.sendMessage(chatId, "⚠️ Ошибка связи с нейросетью. Попробуйте отправить запрос еще раз чуть позже.", getMainKeyboard());
         }
     }
 });
 
-// Обработчик интерактивных инлайн-кнопок (Настройки и Платежка)
+// Блок инлайн кнопок
 bot.on('callback_query', async (query) => {
     const chatId = query.message.chat.id;
     const data = query.data;
     const user = initUser(chatId);
 
-    // Безопасное гашение анимации загрузки кнопки в интерфейсе Telegram
     const answerCallback = () => {
         try { bot.answerCallbackQuery(query.id); } catch (e) { console.error(e); }
     };
 
-    // Переключение стилей текста
     if (data.startsWith('style_')) {
         answerCallback();
         user.style = data.replace('style_', '');
+        saveDatabase();
         return bot.sendMessage(chatId, `Стиль успешно обновлен. Нажмите «🔥 Создать пост», чтобы протестировать его!`, getMainKeyboard());
     }
 
-    // Переключение хэштегов
     if (data === 'toggle_hashtags') {
         answerCallback();
         user.includeHashtags = !user.includeHashtags;
+        saveDatabase();
         return bot.sendMessage(chatId, `Генерация хэштегов теперь: ${user.includeHashtags ? 'ВКЛЮЧЕНА ✅' : 'ВЫКЛЮЧЕНА ❌'}`, getMainKeyboard());
     }
 
-    // Переключение эмодзи (смайликов)
     if (data === 'toggle_emojis') {
         answerCallback();
         user.useEmojis = !user.useEmojis;
+        saveDatabase();
         return bot.sendMessage(chatId, `Использование смайликов теперь: ${user.useEmojis ? 'ВКЛЮЧЕНО ✅' : 'ВЫКЛЮЧЕНО ❌'}`, getMainKeyboard());
     }
 
-    // Генерация ОФИЦИАЛЬНОГО счета через шлюз CryptoBot
+    // ОФИЦИАЛЬНОЕ СОЗДАНИЕ ИНВОЙСА В MAINNET CRYPTOBOT
     if (data === 'buy_crypto') {
         answerCallback();
 
         if (!CRYPTO_BOT_TOKEN) {
-            return bot.sendMessage(chatId, "❌ Ошибка конфигурации: На сервере не задана переменная CRYPTO_BOT_TOKEN. Обратитесь к администратору.");
+            return bot.sendMessage(chatId, "❌ Ошибка конфигурации: На сервере не задан токен CRYPTO_BOT_TOKEN.");
         }
 
         try {
-            // Использование официального рабочего эндпоинта CryptoBot API
+            // ЗАЩИТА: Таймаут запроса к платежке шлюза CryptoBot (Официальный домен Mainnet)
             const cryptoResponse = await axios.post(
                 'https://pay.cryptobot.sh/api/createInvoice',
                 {
@@ -247,7 +275,10 @@ bot.on('callback_query', async (query) => {
                     payload: chatId.toString(), 
                     create_invoice_link: true
                 },
-                { headers: { 'Crypto-Pay-API-Token': CRYPTO_BOT_TOKEN } }
+                { 
+                    headers: { 'Crypto-Pay-API-Token': CRYPTO_BOT_TOKEN },
+                    timeout: 10000 
+                }
             );
 
             if (cryptoResponse.data && cryptoResponse.data.result) {
@@ -264,15 +295,16 @@ bot.on('callback_query', async (query) => {
                     }
                 });
             } else {
-                throw new Error("Некорректный формат ответа от платежного шлюза");
+                throw new Error("Неверный формат ответа от CryptoBot");
             }
         } catch (error) {
-            console.error('Ошибка при создании инвойса в CryptoBot:', error.response ? error.response.data : error.message);
-            bot.sendMessage(chatId, '⚠️ Не удалось сгенерировать счет. Пожалуйста, попробуйте совершить операцию позже.');
+            console.error('Ошибка создания инвойса:', error.response ? error.response.data : error.message);
+            // ПОДСКАЗКА: Если сервер Render заблокирован по IP
+            bot.sendMessage(chatId, '⚠️ Не удалось сгенерировать счет автоматически.\n\nВозможная причина: Сервер хостинга временно заблокирован защитой CryptoBot.\nПожалуйста, попробуйте запросить счет чуть позже.');
         }
     }
 
-    // Ручная проверка статуса оплаты счета
+    // РУЧНАЯ ПРОВЕРКА ОПЛАТЫ
     if (data.startsWith('check_pay_')) {
         answerCallback();
         const invoiceId = data.replace('check_pay_', '');
@@ -281,7 +313,10 @@ bot.on('callback_query', async (query) => {
             const checkResponse = await axios.post(
                 'https://pay.cryptobot.sh/api/getInvoices',
                 { invoice_ids: invoiceId },
-                { headers: { 'Crypto-Pay-API-Token': CRYPTO_BOT_TOKEN } }
+                { 
+                    headers: { 'Crypto-Pay-API-Token': CRYPTO_BOT_TOKEN },
+                    timeout: 10000 
+                }
             );
 
             if (checkResponse.data && checkResponse.data.result && checkResponse.data.result.items.length > 0) {
@@ -289,6 +324,7 @@ bot.on('callback_query', async (query) => {
                 
                 if (invoice.status === 'paid') {
                     user.isPremium = true; 
+                    saveDatabase(); // Сохраняем премиум навсегда!
                     return bot.sendMessage(chatId, "🎉 *Поздравляем! Оплата успешно зафиксирована.*\n\nВам активирован безлимитный Premium-статус! Все ограничения на генерацию текстов сняты навсегда.", { parse_mode: 'Markdown', reply_markup: getMainKeyboard() });
                 } else {
                     return bot.sendMessage(chatId, "❌ Транзакция еще не подтверждена сетью. Пожалуйста, завершите платеж внутри CryptoBot и повторите проверку.");
@@ -298,12 +334,11 @@ bot.on('callback_query', async (query) => {
             }
         } catch (err) {
             console.error("Ошибка при проверке инвойса:", err.message);
-            bot.sendMessage(chatId, "⚠️ Ошибка связи с платежной системой при верификации транзакции.");
+            bot.sendMessage(chatId, "⚠️ Ошибка связи с платежной системой при проверке статуса.");
         }
     }
 });
 
-// Веб-заглушка для удержания процесса на Render.com
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('SaaS AI Copywriter is active and protected!'));
