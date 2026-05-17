@@ -12,6 +12,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@foile/crypto-pay-api": "^1.0.4",
     "axios": "^1.16.1",
     "express": "^5.2.1",
     "node-telegram-bot-api": "^0.67.0",
