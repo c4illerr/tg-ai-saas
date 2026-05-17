@@ -6,18 +6,18 @@ const path = require('path');
 const { CryptoPay } = require('@foile/crypto-pay-api');
 
 // ==========================================
-// НАСТРОЙКИ АДМИНИСТРАТОРА (ТВОЙ ID ВШИТ)
+// НАСТРОЙКИ АДМИНИСТРАТОРА (ДАННЫЕ ВШИТЫ)
 // ==========================================
 const ADMIN_ID = 6583231440; 
+const ADMIN_USERNAME = "svrtwww";
 
 // Валидация ключей из окружения Render
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const CRYPTO_BOT_TOKEN = process.env.CRYPTO_BOT_TOKEN; 
-const YOOKASSA_TOKEN = process.env.YOOKASSA_TOKEN; 
 
-if (!TELEGRAM_TOKEN || !OPENROUTER_API_KEY || !CRYPTO_BOT_TOKEN || !YOOKASSA_TOKEN) {
-    console.error("❌ КРИТИЧЕСКАЯ ОШИБКА: Проверьте Environment на Render! Не хватает ключей!");
+if (!TELEGRAM_TOKEN || !OPENROUTER_API_KEY || !CRYPTO_BOT_TOKEN) {
+    console.error("❌ КРИТИЧЕСКАЯ ОШИБКА: Проверьте Environment на Render! Не хватает ключей.");
     process.exit(1);
 }
 
@@ -60,7 +60,6 @@ loadDatabase();
 
 const LIMIT = 5; 
 const PRICE_USD = 3; 
-const PRICE_RUB = 290; 
 
 const STYLES = {
     expert: "Строгий, экспертный и аналитический стиль. Меньше воды, максимум фактов, цифр и пользы.",
@@ -138,7 +137,6 @@ function getSettingsMenuData(user) {
 // БЛОК АДМИН-ПАНЕЛИ (ТОЛЬКО ДЛЯ ТЕБЯ)
 // ==========================================
 
-// 1. Вызов админки командой /admin
 bot.onText(/\/admin/, (msg) => {
     const chatId = msg.chat.id;
     if (chatId !== ADMIN_ID) return;
@@ -154,7 +152,6 @@ bot.onText(/\/admin/, (msg) => {
     });
 });
 
-// 2. Команда генерации промокода: /gencode КОД КОЛИЧЕСТВО
 bot.onText(/\/gencode (.+) (.+)/, (msg, match) => {
     const chatId = msg.chat.id;
     if (chatId !== ADMIN_ID) return;
@@ -171,7 +168,6 @@ bot.onText(/\/gencode (.+) (.+)/, (msg, match) => {
     bot.sendMessage(chatId, `✅ *Промокод успешно создан!*\n\n• Код: \`${codeName}\`\n• Активаций: *${maxUses}*`, { parse_mode: 'Markdown' });
 });
 
-// 3. Ручное управление Premium по ID: /setpremium ID true/false
 bot.onText(/\/setpremium (.+) (.+)/, (msg, match) => {
     const chatId = msg.chat.id;
     if (chatId !== ADMIN_ID) return;
@@ -189,12 +185,10 @@ bot.onText(/\/setpremium (.+) (.+)/, (msg, match) => {
 
     bot.sendMessage(chatId, `✅ Статус пользователя \`${targetId}\` успешно изменен.\n• Premium: *${setPremium ? 'ВКЛ 💎' : 'ВЫКЛ 🆓'}*`, { parse_mode: 'Markdown' });
     
-    // Уведомляем пользователя об изменении статуса
     bot.sendMessage(targetId, setPremium 
         ? "🎉 Администратор вручную активировал вам полный **Premium-доступ**! Все лимиты сняты." 
         : "⚠️ Ваш Premium-статус был изменен администратором на базовый.", { parse_mode: 'Markdown' }).catch(() => {});
 });
-
 
 // ==========================================
 // ОСНОВНАЯ ЛОГИКА БОТА
@@ -214,7 +208,7 @@ bot.on('message', async (msg) => {
     if (!text || text.startsWith('/')) return;
     const user = initUser(chatId);
 
-    // Админская рассылка: ловим сообщение для отправки
+    // Админская рассылка
     if (chatId === ADMIN_ID && user.status === 'admin_waiting_broadcast') {
         user.status = 'idle';
         saveDatabase();
@@ -227,11 +221,8 @@ bot.on('message', async (msg) => {
             try {
                 await bot.sendMessage(uId, text);
                 successCount++;
-                // Небольшая задержка, чтобы Телеграм не заблокировал за спам
                 await new Promise(resolve => setTimeout(resolve, 50)); 
-            } catch (err) {
-                // Пользователь мог заблокировать бота
-            }
+            } catch (err) {}
         }
         return bot.sendMessage(chatId, `🎉 *Рассылка успешно завершена!*\n\nДоставлено пользователей: *${successCount}/${allUserIds.length}*`, { parse_mode: 'Markdown', reply_markup: getMainKeyboard() });
     }
@@ -296,13 +287,16 @@ bot.on('message', async (msg) => {
             message += "✨ Вам доступны безлимитные генерации без ограничений!";
             return bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
         } else {
-            message += `🚀 Избавься от лимитов! Выберите удобный способ оплаты подписки на месяц:\n\nЕсли у вас есть промокод — просто отправьте его текстовым сообщением в чат!`;
+            message += `🚀 *Избавься от лимитов и открой Premium!*\n\n` +
+                       `🪙 *Способ 1:* Моментальная оплата криптовалютой (3 USDT) через защищенный шлюз CryptoBot.\n\n` +
+                       `💳 *Способ 2:* Оплата обычной банковской картой РФ / СБП (290 рублей). Для этого переведите нужную сумму на карту и пришлите чек администратору. Нажмите кнопку ниже для связи.\n\n` +
+                       `💬 Если у вас есть промокод — просто отправьте его сообщением в этот чат!`;
             return bot.sendMessage(chatId, message, {
                 parse_mode: 'Markdown',
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: "💳 Оплатить Картой РФ / СБП (290 руб)", callback_data: "buy_yookassa" }],
-                        [{ text: "🪙 Оплатить Криптовалютой (3 USDT)", callback_data: "buy_crypto" }]
+                        [{ text: "🪙 Оплатить в USDT (CryptoBot)", callback_data: "buy_crypto" }],
+                        [{ text: "👤 Оплатить Картой РФ (Написать Админу)", url: `https://t.me/${ADMIN_USERNAME}` }]
                     ]
                 }
             });
@@ -312,12 +306,12 @@ bot.on('message', async (msg) => {
     if (user.count >= LIMIT && !user.isPremium) {
         user.status = 'idle';
         saveDatabase();
-        return bot.sendMessage(chatId, `❌ *Доступ заблокирован!*\n\nВы исчерпали лимит бесплатных генераций (${LIMIT}/${LIMIT}).`, {
+        return bot.sendMessage(chatId, `❌ *Доступ заблокирован!*\n\nВы исчерпали лимит бесплатных генераций (${LIMIT}/${LIMIT}).\n\nДля продления оплатите счет в USDT через кнопку ниже или напишите админу для оплаты картой РФ.`, {
             parse_mode: 'Markdown',
             reply_markup: {
                 inline_keyboard: [
-                    [{ text: "💳 Картой РФ / СБП (290 руб)", callback_data: "buy_yookassa" }],
-                    [{ text: "🪙 Криптой через CryptoBot (3 USDT)", callback_data: "buy_crypto" }]
+                    [{ text: "🪙 Оплатить в USDT (CryptoBot)", callback_data: "buy_crypto" }],
+                    [{ text: "👤 Оплатить Картой (Написать Админу)", url: `https://t.me/${ADMIN_USERNAME}` }]
                 ]
             }
         });
@@ -391,7 +385,6 @@ bot.on('callback_query', async (query) => {
         } catch (e) {}
     };
 
-    // Админские инлайн-действия
     if (chatId === ADMIN_ID && data === 'admin_stats') {
         answerCallback();
         const users = Object.values(dbData.users);
@@ -406,7 +399,7 @@ bot.on('callback_query', async (query) => {
         answerCallback();
         user.status = 'admin_waiting_broadcast';
         saveDatabase();
-        return bot.sendMessage(chatId, "✉️ *Введите текст для общей рассылки всем пользователям:*\n\n_(Внимание: следующее ваше сообщение уйдет абсолютно всем людям из базы данных!)_", { parse_mode: 'Markdown' });
+        return bot.sendMessage(chatId, "✉️ *Введите текст для общей рассылки всем пользователям:*", { parse_mode: 'Markdown' });
     }
 
     if (data.startsWith('style_')) {
@@ -421,25 +414,6 @@ bot.on('callback_query', async (query) => {
     if (data === 'edit_project_data') {
         answerCallback(); user.status = 'waiting_project_name'; saveDatabase();
         return bot.sendMessage(chatId, "✏️ Введите название вашего проекта или нишу бизнеса:");
-    }
-
-    // Оплата ЮKassa
-    if (data === 'buy_yookassa') {
-        answerCallback();
-        try {
-            await bot.sendInvoice(
-                chatId,
-                'Premium подписка (1 месяц)',
-                'Полный безлимит на генерацию постов, доступ ко всем 6 стилям ИИ-копирайтера и приоритетная скорость ответов.',
-                `premium_sub_${chatId}_${Date.now()}`, 
-                YOOKASSA_TOKEN,
-                'RUB',
-                [{ label: 'Premium Доступ', amount: PRICE_RUB * 100 }] 
-            );
-        } catch (error) {
-            console.error('Ошибка отправки инвойса ЮKassa:', error.message);
-            bot.sendMessage(chatId, '⚠️ Не удалось запустить рублевый шлюз. Попробуйте оплату через Криптовалюту.');
-        }
     }
 
     // Оплата CryptoBot
@@ -484,23 +458,6 @@ bot.on('callback_query', async (query) => {
             bot.sendMessage(chatId, "⚠️ Ошибка верификации.");
         }
     }
-});
-
-// ОБРАБОТЧИКИ ОПЛАТЫ ЮKASSA
-bot.on('pre_checkout_query', (query) => {
-    bot.answerPreCheckoutQuery(query.id, true).catch(err => console.error('Ошибка PreCheckout:', err.message));
-});
-
-bot.on('successful_payment', (msg) => {
-    const chatId = msg.chat.id;
-    const user = initUser(chatId);
-    
-    user.isPremium = true;
-    user.count = 0;
-    user.status = 'idle';
-    saveDatabase();
-
-    bot.sendMessage(chatId, "🎉 *Оплата картой прошла успешно!*\n\nВаш Premium-статус активирован на 30 дней. Ограничения полностью сняты, спасибо за покупку!", { parse_mode: 'Markdown', reply_markup: getMainKeyboard() });
 });
 
 // Запуск веб-сервера 
