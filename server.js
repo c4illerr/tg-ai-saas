@@ -271,7 +271,7 @@ bot.on('message', async (msg) => {
     if (text === "🎯 Мой проект (Персонализация)") {
         const message = `🎯 *Персонализация текстов под ваш бизнес:*\n\n` +
                         `• Ваш проект/канал: *${user.projectName}*\n` +
-                        `• Целевая аудитория: *${user.projectTarget}*\n\n` +
+                        `• Целевая аудитории: *${user.projectTarget}*\n\n` +
                         `Нейросеть адаптирует контент под эти данные!`;
         return bot.sendMessage(chatId, message, {
             parse_mode: 'Markdown',
@@ -323,14 +323,32 @@ bot.on('message', async (msg) => {
         return bot.sendMessage(chatId, "📝 Отправь мне сырой текст или тему поста:");
     }
 
-    // Генерация текста ИИ
+    // ==========================================
+    // ГЕНЕРАЦИЯ ТЕКСТА ИИ (ОБНОВЛЕННЫЙ ЖЕСТКИЙ ПРОМПТ)
+    // ==========================================
     if (user.status === 'waiting_text' || (!text.startsWith('⚙️') && !text.startsWith('💎') && !text.startsWith('🔥') && !text.startsWith('🎯'))) {
         bot.sendChatAction(chatId, 'typing');
         
         const chosenStyleInstructions = STYLES[user.style];
-        const hashtagInstruction = user.includeHashtags ? "В самом конце поста добавь 3-5 хэштегов." : "Не добавляй хэштеги.";
-        const emojiInstruction = user.useEmojis ? "Используй подходящие эмодзи для структуры." : "Категорически запрещено использовать эмодзи.";
-        const personalizationInstruction = `Контекст проекта: Название проекта — "${user.projectName}". Целевая аудитория — "${user.projectTarget}". Адаптируй боли текста под эту аудиторию.`;
+        
+        // Формируем строгие изолированные инструкции для комбинации флагов настроек
+        let systemPrompt = `Ты — профессиональный Telegram-копирайтер.\n`;
+        systemPrompt += `1. ТВОЙ СТИЛЬ: ${chosenStyleInstructions}\n`;
+        
+        if (user.useEmojis) {
+            systemPrompt += `2. ЭМОДЗИ: Обязательно используй подходящие эмодзи для оформления структуры, списков и акцентов. Сделай текст визуально привлекательным.\n`;
+        } else {
+            systemPrompt += `2. ЭМОДЗИ: Категорически запрещено использовать абсолютно любые эмодзи, смайлики или графические символы в тексте. Выдавай только чистый голый текст.\n`;
+        }
+        
+        if (user.includeHashtags) {
+            systemPrompt += `3. ХЭШТЕГИ: В самом конце текста с новой строки добавь 3-5 релевантных хэштегов.\n`;
+        } else {
+            systemPrompt += `3. ХЭШТЕГИ: Категорически запрещено добавлять любые хэштеги в конце или внутри текста.\n`;
+        }
+        
+        systemPrompt += `4. КОНТЕКСТ БИЗНЕСА: Название проекта — "${user.projectName}". Целевая аудитория — "${user.projectTarget}". Обязательно адаптируй боли, триггеры и выгоды текста конкретно под эту аудиторию.\n`;
+        systemPrompt += `Выдай ТОЛЬКО готовый финальный пост для публикации, без твоих вводных слов, приветствий и каких-либо комментариев автора.`;
 
         try {
             const response = await axios.post(
@@ -339,7 +357,7 @@ bot.on('message', async (msg) => {
                     "model": "google/gemini-2.5-flash", 
                     "max_tokens": 1500, 
                     "messages": [
-                        { role: "system", content: `Ты — копирайтер для Telegram. Стиль: ${chosenStyleInstructions}. Эмодзи: ${emojiInstruction}. Хэштеги: ${hashtagInstruction}. ${personalizationInstruction} Выдай только готовый текст.` },
+                        { role: "system", content: systemPrompt },
                         { role: "user", content: text }
                     ]
                 },
@@ -350,7 +368,7 @@ bot.on('message', async (msg) => {
             aiReply = safeMarkdown(aiReply);
 
             if (!user.isPremium) user.count++;
-            user.status = 'idle';
+            user.status = 'idle'; 
             saveDatabase();
 
             try {
