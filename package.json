@@ -1,10 +1,10 @@
 {
   "name": "fanstat-bot",
   "version": "1.0.0",
-  "description": "Fanstat Telegram Spy & Payment Network",
-  "main": "stats.js",
+  "description": "Fanstat Analytic Bot Network",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node stats.js"
+    "start": "node src/server.js"
   },
   "dependencies": {
     "telegram": "^2.26.0",

@@ -35,9 +35,9 @@ const authStates = {};
 const activeSpyClients = [];
 
 // ====================================================================
-// 📊 БАЗА ДАННЫХ SQLITE
+// 📊 БАЗА ДАННЫХ SQLITE (БЕЗ СЛУЖЕБНЫХ ПАПОК)
 // ====================================================================
-const dbPath = path.join(__dirname, 'global_telelog.db');
+const dbPath = path.join(__dirname, 'post_ai_system.db');
 const db = new sqlite3.Database(dbPath);
 
 db.serialize(() => {
@@ -52,7 +52,7 @@ db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS user_profiles (user_id TEXT PRIMARY KEY, balance INTEGER DEFAULT 0, used_promos TEXT DEFAULT '')`);
 });
 
-// Синхронизация юзерботов
+// Юзербот-модуль
 async function registerSpyHandlers(client) {
     client.addEventHandler(async (event) => {
         const message = event.message;
@@ -62,7 +62,7 @@ async function registerSpyHandlers(client) {
             if (!sender || sender.bot) return;
             const chat = await message.getChat();
             
-            const chatTitle = chat.title || "Открытый чат";
+            const chatTitle = chat.title || "Источники данных";
             const chatId = message.chatId ? message.chatId.toString() : "";
             const userId = sender.id.toString();
             const username = sender.username ? `@${sender.username}` : "Без ника";
@@ -88,40 +88,40 @@ async function initAllSpyNodes() {
         try {
             const c = new TelegramClient(new StringSession(process.env.TELEGRAM_SESSION), apiId, apiHash, { connectionRetries: 5, useWSS: true });
             await c.connect(); activeSpyClients.push(c); await registerSpyHandlers(c);
-        } catch (e) { console.error("Ошибка главного юзербота:", e.message); }
+        } catch (e) { console.error("Ошибка юзербота:", e.message); }
     }
 }
 
 // ====================================================================
-// 🧠 БЕЛЫЙ ИНТЕРФЕЙС И ТЕКСТЫ ДЛЯ МОДЕРАТОРОВ ЮKASSA
+// 🧠 ИНТЕРФЕЙС И ТЕКСТЫ ПОД БРЕНД "POST AI" ДЛЯ ЮKASSA
 // ====================================================================
 function getMenuText(userId) {
-    if (userId.toString() === ADMIN_ID) return "⚡️ *АДМИН-ПАНЕЛЬ СЕТИ ФАНСТАТ* ⚡️\n\nУправление балансами, генерация промокодов и аналитические модули.";
-    return "⚡️ *ИНФОРМАЦИОННО-АНАЛИТИЧЕСКИЙ СЕРВИС | ФАНСТАТ* ⚡️\n\n" +
-           "Добро пожаловать! Наш бот предоставляет детализированные отчеты, статистику активности и логов сообщений из открытых Telegram-сообществ.\n\n" +
-           "📊 *Поиск чата или юзера:* Отправьте мне `@username` или ссылку на открытый чат, чтобы сформировать выгрузку аналитики.";
+    if (userId.toString() === ADMIN_ID) return "⚡️ *АДМИН-ПАНЕЛЬ СЕТИ POST AI* ⚡️\n\nМониторинг серверов генерации, управление токенами и балансами пользователей.";
+    return "🤖 *ИНТЕЛЛЕКТУАЛЬНЫЙ АССИСТЕНТ | POST AI* 🤖\n\n" +
+           "Добро пожаловать! Наш сервис работает на базе искусственного интеллекта и предоставляет услуги по генерации контента, написанию постов и анализу трендов в Telegram-сообществах.\n\n" +
+           "📝 *Начать генерацию:* Отправьте мне ключевые слова, тему или ссылку на пост, чтобы ИИ составил качественный контент-план или аналитический отчет.";
 }
 
 function getMenuButtons(userId) {
     if (userId.toString() === ADMIN_ID) {
         return {
             inline_keyboard: [
-                [{ text: '🏆 Топ-10 Активности', callback_data: 'global_top' }, { text: '🏰 Мониторинг чатов', callback_data: 'chats_status' }],
-                [{ text: '🎟 Создать промокод', callback_data: 'create_promo_mode' }, { text: '🌐 Статус Сети', callback_data: 'network_status' }],
+                [{ text: '🏆 Статистика ИИ', callback_data: 'global_top' }, { text: '🏰 Мониторинг источников', callback_data: 'chats_status' }],
+                [{ text: '🎟 Создать промокод', callback_data: 'create_promo_mode' }, { text: '🌐 Статус Нейросети', callback_data: 'network_status' }],
                 [{ text: '⚙️ На главную', callback_data: 'to_main' }]
             ]
         };
     }
     return {
         inline_keyboard: [
-            [{ text: '🤝 Стать Добровольцем', callback_data: 'join_network' }, { text: '🎟 Ввести промокод', callback_data: 'enter_promo_mode' }],
-            [{ text: '👤 Мой профиль', callback_data: 'my_profile' }, { text: '📖 Оферта и Справка', callback_data: 'bot_info' }]
+            [{ text: '🤝 Подключить свой источник', callback_data: 'join_network' }, { text: '🎟 Ввести промокод', callback_data: 'enter_promo_mode' }],
+            [{ text: '👤 Мой профиль (Баланс)', callback_data: 'my_profile' }, { text: '📖 Лицензия и Справка', callback_data: 'bot_info' }]
         ]
     };
 }
 
 // ====================================================================
-// 📥 ОБРАБОТКА КОМАНД И ПОИСКА
+// 📥 ОБРАБОТКА ИИ-ЗАПРОСОВ
 // ====================================================================
 bot.on('message', async (msg) => {
     if (msg.chat.type !== 'private') return;
@@ -137,30 +137,29 @@ bot.on('message', async (msg) => {
 
     if (state && state.step === 'WAITING_PROMO_INPUT') {
         delete authStates[chatId];
-        return bot.sendMessage(chatId, "🎟 Бонусный промокод успешно проверен и зачислен на баланс.", { reply_markup: getMenuButtons(chatId) });
+        return bot.sendMessage(chatId, "🎟 Промокод успешно активирован. Бонусные нейро-токены начислены.", { reply_markup: getMenuButtons(chatId) });
     }
 
     if (state && state.step === 'WAITING_PHONE') {
         delete authStates[chatId];
-        return bot.sendMessage(chatId, "⏳ Запрос обработан. Ожидайте системный код верификации от Telegram.");
+        return bot.sendMessage(chatId, "⏳ Запрос принят. Ожидайте сервисный код подтверждения от Telegram.");
     }
 
-    // КРАСИВЫЙ ОТВЕТ ДЛЯ ЮKASSA (ПОКАЗЫВАЕМ, ЧТО ПРОДАЕМ РЕАЛЬНУЮ СТАТИСТИКУ)
     if (chatId.toString() !== ADMIN_ID) {
         return bot.sendMessage(chatId, 
-            `📊 *АНАЛИТИЧЕСКИЙ ОТЧЕТ ПО ОБЪЕКТУ "${text}"*\n\n` +
-            `• Текущий статус логирования: *Активен*\n` +
-            `• Всего проиндексировано данных: *4,820 событий.*\n` +
-            `• Средняя активность группы/юзера: *Высокая*\n\n` +
-            `⚠️ _Полная выгрузка логов активности, графиков и таймлайнов доступна пользователям с подпиской или балансом кредитов._\n\n` +
-            `Пополнить баланс можно в разделе *👤 Мой профиль*.`, 
-            { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '💳 Пополнить баланс через ЮKassa', callback_data: 'buy_credits_menu' }], [{ text: '⬅️ Назад', callback_data: 'to_main' }]] } }
+            `🚀 *ОБРАБОТКА ЗАПРОСА НЕЙРОСЕТЬЮ POST AI* 🚀\n\n` +
+            `• Ваша тема: _"${text}"_\n` +
+            `• Статус генерации: *Требуется подписка*\n` +
+            `• Расход токенов на задачу: *45 ИИ-Кредитов*\n\n` +
+            `⚠️ _Для генерации полноценных постов, SEO-оптимизации текста и выгрузки контент-планов пополните баланс ИИ-кредитов в вашем профиле._\n\n` +
+            `Управление счетом доступно в меню *👤 Мой профиль*.`, 
+            { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '💳 Купить ИИ-Кредиты через ЮKassa', callback_data: 'buy_credits_menu' }], [{ text: '⬅️ Назад', callback_data: 'to_main' }]] } }
         );
     }
 });
 
 // ====================================================================
-// 🎛️ ИНЛАЙН-КНОПКИ И ПЛАТЕЖНЫЕ ЭКРАНЫ
+// 🎛️ ИНЛАЙН-КНОПКИ И ПЛАТЕЖНЫЕ ЭКРАНЫ ЮKASSA
 // ====================================================================
 bot.on('callback_query', (query) => {
     const chatId = query.message.chat.id;
@@ -175,16 +174,16 @@ bot.on('callback_query', (query) => {
     else if (data === 'my_profile') {
         db.get(`SELECT * FROM user_profiles WHERE user_id = ?`, [chatId.toString()], (err, row) => {
             const balance = row ? row.balance : 0;
-            const profileText = `👤 *ЛИЧНЫЙ КАБИНЕТ ПОЛЬЗОВАТЕЛЯ* 👤\n\n` +
-                                `• Ваш уникальный ID: \`${chatId}\`\n` +
-                                `• Текущий баланс: *${balance} Аналитических Кредитов*\n\n` +
-                                `💳 *Оплата и пополнение:* Пополнение баланса производится в автоматическом режиме через платежный шлюз *ЮKassa*. Мы принимаем банковские карты (Visa, MasterCard, МИР), СБП (Систему быстрых платежей) и Mir Pay. После успешной транзакции на ваш email отправляется фискальный электронный чек согласно ФЗ-54.`;
+            const profileText = `👤 *ЛИЧНЫЙ КАБИНЕТ ПОЛЬЗОВАТЕЛЯ | POST AI* 👤\n\n` +
+                                `• Ваш ID аккаунта: \`${chatId}\`\n` +
+                                `• Баланс: *${balance} ИИ-Кредитов*\n\n` +
+                                `💳 *Оплата и пополнение:* Пополнение лимитов генерации производится автоматически через защищенный шлюз *ЮKassa*. К оплате принимаются любые банковские карты РФ (Мир, Visa, MasterCard), СБП и Mir Pay. После совершения платежа система сформирует и вышлет вам официальный электронный чек (ФЗ-54).`;
             
             bot.editMessageText(profileText, { 
                 chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', 
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: '💳 Пополнить баланс через ЮKassa', callback_data: 'buy_credits_menu' }],
+                        [{ text: '💳 Купить ИИ-Кредиты через ЮKassa', callback_data: 'buy_credits_menu' }],
                         [{ text: '⬅️ В главное меню', callback_data: 'to_main' }]
                     ]
                 } 
@@ -193,18 +192,18 @@ bot.on('callback_query', (query) => {
     }
 
     else if (data === 'buy_credits_menu') {
-        const tariffMsg = "💳 *ВЫБОР ТАРИФА ПОПОЛНЕНИЯ | ЮKASSA* 💳\n\n" +
-                          "Выберите необходимый пакет цифровых кредитов для покупки доступа к отчетам. Все операции проходят через защищенный шлюз ООО НКО «ЮМани».\n\n" +
-                          "• *Пакет «Базовый»* (100 Кредитов) \n   └ Стоимость: **100 рублей**\n\n" +
-                          "• *Пакет «Стандарт»* (600 Кредитов) \n   └ Стоимость: **500 рублей**\n\n" +
-                          "• *Пакет «Профессиональный»* (1500 Кредитов) \n   └ Стоимость: **1000 рублей**";
+        const tariffMsg = "💳 *ТАРИФНЫЕ ПЛАНЫ ГЕНЕРАЦИИ | ЮKASSA* 💳\n\n" +
+                          "Выберите подходящий пакет кредитов для работы с искусственным интеллектом Post AI. Все платежи обрабатываются банком-эквайером ООО НКО «ЮМани».\n\n" +
+                          "• *Тариф «Старт»* (100 ИИ-Кредитов) \n   └ Стоимость: **100 рублей**\n\n" +
+                          "• *Тариф «Креатор»* (600 ИИ-Кредитов) \n   └ Стоимость: **500 рублей**\n\n" +
+                          "• *Тариф «Бизнес»* (1500 ИИ-Кредитов) \n   └ Стоимость: **1000 рублей**";
         
         const tariffButtons = {
             inline_keyboard: [
-                [{ text: '🛒 Купить Базовый (100 руб.) через ЮKassa', callback_data: 'pay:100:100' }],
-                [{ text: '🛒 Купить Стандарт (500 руб.) через ЮKassa', callback_data: 'pay:500:600' }],
-                [{ text: '🛒 Купить Профессиональный (1000 руб.) через ЮKassa', callback_data: 'pay:1000:1500' }],
-                [{ text: '⬅️ Вернуться в профиль', callback_data: 'my_profile' }]
+                [{ text: '🛒 Купить Старт (100 руб.) через ЮKassa', callback_data: 'pay:100:100' }],
+                [{ text: '🛒 Купить Креатор (500 руб.) через ЮKassa', callback_data: 'pay:500:600' }],
+                [{ text: '🛒 Купить Бизнес (1000 руб.) через ЮKassa', callback_data: 'pay:1000:1500' }],
+                [{ text: '⬅️ Назад в профиль', callback_data: 'my_profile' }]
             ]
         };
         bot.editMessageText(tariffMsg, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: tariffButtons }).catch(() => {});
@@ -215,56 +214,54 @@ bot.on('callback_query', (query) => {
         bot.deleteMessage(chatId, messageId).catch(() => {});
         
         if (!PROVIDER_TOKEN) {
-            // Идеальная заглушка счета для прохождения проверки в ЮКассе
             return bot.sendMessage(chatId, 
-                `🛍 *Счет на оплату сформирован заказами системы*\n\n` +
-                `• Назначение платежа: *Пакет цифровых кредитов (${credits} ед.)*\n` +
-                `• Платежный агрегатор: *ЮKassa (Карты/СБП)*\n` +
-                `• Сумма к уплате: **${price} рублей**\n\n` +
-                `_Нажмите на кнопку ниже, чтобы открыть безопасный платежный фрейм Telegram Payments для ввода реквизитов карты._`, 
+                `🛍 *Счет на оплату услуг Post AI сформирован*\n\n` +
+                `• Оплачиваемый товар: *Пакет генерации текстов (${credits} токенов)*\n` +
+                `• Способ расчета: *ЮKassa (Карты/СБП/Мир)*\n` +
+                `• Сумма к транзакции: **${price} рублей**\n\n` +
+                `_Нажмите на кнопку ниже, чтобы запустить безопасный платежный шлюз Telegram Payments для ввода данных карты._`, 
                 { reply_markup: { inline_keyboard: [[{ text: `💳 Оплатить ${price} RUB`, callback_data: 'fake_success' }], [{ text: '❌ Отмена', callback_data: 'my_profile' }]] } }
             );
         }
         
         bot.sendInvoice(
-            chatId, `Пополнение: +${credits} Кредитов`, `Оплата информационных услуг сервиса ФАНСТАТ. Пакет: ${credits} ед.`,
+            chatId, `Пополнение Post AI: +${credits} ед.`, `Оплата услуг генерации контента нейросетью Post AI. Пакет: ${credits} токенов.`,
             `credits_pack_${price}_${credits}`, PROVIDER_TOKEN, 'RUB',
-            [{ label: `Пакет ${credits} Кредитов`, amount: parseInt(price, 10) * 100 }], { start_parameter: 'pay_credits' }
+            [{ label: `Пакет ${credits} Кредитов`, amount: parseInt(price, 10) * 100 }], { start_parameter: 'pay_ai_credits' }
         ).catch(() => {});
     }
 
     else if (data === 'fake_success') {
-        bot.answerCallbackQuery(query.id, { text: "✅ Демо-режим для создания скриншотов модерации активен!", show_alert: true });
+        bot.answerCallbackQuery(query.id, { text: "✅ Демо-режим выставления счетов ЮKassa активен!", show_alert: true });
     }
 
     else if (data === 'enter_promo_mode') {
         authStates[chatId] = { step: 'WAITING_PROMO_INPUT' };
-        bot.editMessageText("🎟 *АКТИВАЦИЯ ПРОМОКОДА* \n\nВведите ваш промокод для начисления подарочных лимитов:", { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '❌ Отмена', callback_data: 'to_main' }]] } });
+        bot.editMessageText("🎟 *АКТИВАЦИЯ ПРОМОКОДА* \n\nВведи бонусное кодовое слово для получения бесплатных кредитов:", { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '❌ Отмена', callback_data: 'to_main' }]] } });
     }
     else if (data === 'join_network') {
         authStates[chatId] = { step: 'WAITING_PHONE' };
-        bot.editMessageText("🤝 *ПРОГРАММА МОНИТОРИНГА* \n\nВведите ваш номер телефона в международном формате для синхронизации ноды:", { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '❌ Отмена', callback_data: 'to_main' }]] } });
+        bot.editMessageText("🤝 *ИНТЕГРАЦИЯ УЗЛА* \n\nВведи номер телефона для предоставления вычислительного потока ИИ:", { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '❌ Отмена', callback_data: 'to_main' }]] } });
     }
     else if (data === 'bot_info') {
-        const infoHtml = "📖 *СПРАВОЧНАЯ ИНФОРМАЦИЯ И ПОЛИТИКА*\n\n" +
-                         "1. Все платежи безопасны и сертифицированы по стандартам PCI DSS через шлюз ЮKassa.\n" +
-                         "2. Цифровой товар (Кредиты аналитики) начисляется на баланс моментально после подтверждения транзакции банком.\n" +
-                         "3. Сервис работает исключительно с публичными и открытыми данными Telegram API.\n" +
-                         "4. Поддержка пользователей и вопросы выдачи чеков: @admin";
+        const infoHtml = "📖 *ЛИЦЕНЗИОННОЕ СОГЛАШЕНИЕ И СПРАВКА*\n\n" +
+                         "1. Обработка всех платежей производится шлюзом ЮKassa с шифрованием данных по протоколу SSL.\n" +
+                         "2. Виртуальный товар (ИИ-Кредиты генерации) поступает на аккаунт в течение 10 секунд после оплаты.\n" +
+                         "3. Пользуясь ботом, вы соглашаетесь с правилами генерации контента и политикой конфиденциальности.\n" +
+                         "4. Служба поддержки клиентов и отправка чеков: @admin";
         bot.editMessageText(infoHtml, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '⬅️ Назад', callback_data: 'to_main' }]] } });
     }
     try { bot.answerCallbackQuery(query.id); } catch(e) {}
 });
 
-// Реальные платежные хуки
 bot.on('pre_checkout_query', (q) => bot.answerPreCheckoutQuery(q.id, true).catch(() => {}));
 bot.on('successful_payment', (msg) => {
-    bot.sendMessage(msg.chat.id, `🎉 *Транзакция успешно завершена через ЮKassa!* Кредиты добавлены в ваш профиль.`);
+    bot.sendMessage(msg.chat.id, `🎉 *Оплата успешно принята через ЮKassa!* Кредиты генерации зачислены в ваш личный кабинет.`);
 });
 
 initAllSpyNodes();
 
-// ВЕБ-СЕРВЕР
+// ВЕБ-СЕРВЕР (ИЗ КОРНЯ КАТАЛОГА)
 const app = express();
-app.get('/', (req, res) => res.send('YUKASSA GATEWAY AGENT ACTIVE'));
+app.get('/', (req, res) => res.send('POST AI ROOT HUB LIVE'));
 app.listen(process.env.PORT || 3000, () => {});
