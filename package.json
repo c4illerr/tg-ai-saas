@@ -1,16 +1,16 @@
 {
-  "name": "fanstat-bot",
-  "version": "1.0.0",
-  "description": "Fanstat Analytic Bot Network",
-  "main": "src/server.js",
-  "scripts": {
-    "start": "node src/server.js"
-  },
-  "dependencies": {
-    "telegram": "^2.26.0",
-    "node-telegram-bot-api": "^0.66.0",
-    "sqlite3": "^5.1.7",
-    "express": "^4.19.2",
-    "axios": "^1.6.8"
-  }
+"name": "fanstat-bot",
+"version": "1.0.0",
+"description": "Fanstat Analytic Bot Network",
+"main": "server.js",
+"scripts": {
+"start": "node server.js"
+},
+"dependencies": {
+"telegram": "^2.26.0",
+"node-telegram-bot-api": "^0.66.0",
+"sqlite3": "^5.1.7",
+"express": "^4.19.2",
+"axios": "^1.6.8"
+}
 }
